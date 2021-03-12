@@ -1,0 +1,259 @@
+---
+title: "EV Analysis"
+author: "Alex McCumber"
+date: "3/8/2021"
+output: html_document
+---
+
+```{r}
+library(reshape2)
+library(dplyr)
+library(stats)
+library(lme4)
+library(purrr)
+library(ggplot2)
+library(nlme)
+
+#read in datafile
+nickdata = read.csv("~/EVData/EVData.csv")
+```
+
+```{r}
+#write function to make plots
+
+mediaPlot = function(medvar){
+  
+ND = melt(nickdata, id.vars = c("pH", "media", "organism")) %>%
+  subset(., media == medvar)
+  
+ggplot(ND, aes(x=pH, y=value)) +
+  geom_point(aes(color=organism), alpha = 0.3) +
+  scale_color_manual(values=c("darkslategray4", "mediumorchid4","#BF812D")) +
+  stat_summary(aes(y=value, group = organism, color = organism), fun.y = mean, geom = "line", ) +
+  stat_summary(aes(y=value, group = organism), fun.data = mean_se, geom = "errorbar", width = 0.1, alpha = 0.7) +
+  theme_bw() +
+  xlab("pH")+
+  ylab("Zeta Potential (mV)") + 
+  ggtitle(medvar)
+}
+
+media = list("PBS","NaCl","MgCl", "HA")
+
+MPlots = map(media, mediaPlot)
+
+OrgPlot = function(orgvar){
+  
+ND = melt(nickdata, id.vars = c("pH", "media", "organism")) %>%
+  subset(., organism == orgvar)
+  
+ggplot(ND, aes(x=pH, y=value)) +
+  geom_point(aes(color=media), alpha = 0.3) +
+  scale_color_manual(values=c("darkslategray4", "mediumorchid4","#BF812D", "cornflowerblue")) +
+  stat_summary(aes(y=value, group = media, color = media), fun.y = mean, geom = "line", ) +
+  stat_summary(aes(y=value, group = media), fun.data = mean_se, geom = "errorbar", width = 0.1, alpha = 0.7) +
+  theme_bw() +
+  xlab("pH")+
+  ylab("Zeta Potential (mV)") + 
+  ggtitle(orgvar)
+}
+
+orgs = list("S.aureus", "P.fluorescens", "S.cerevisiae")
+
+OPlots = map(orgs, OrgPlot)
+```
+
+```{r}
+ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
+
+ND$ID = paste(ND$media, ND$variable, sep = ".")
+
+NDSA = subset(ND, organism == "S.aureus")
+
+#set PBS as control
+NDSA$media = factor(NDSA$media, levels = c("PBS", "NaCl", "MgCl", "HA"))
+
+model = lmer(value ~ 1 + pH*media + (1|ID), data = NDSA)
+
+summary(model)
+
+confint(model) %>%
+  data.frame(.)
+
+AIC(model)
+
+model = lme(value ~ 1 + pH*media,
+            random = ~1|ID,
+            data = NDSA)
+
+anova(model)
+
+summary(model) 
+```
+
+```{r}
+ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
+
+ND$ID = paste(ND$media, ND$variable, sep = ".")
+
+NDPF = subset(ND, organism == "P.fluorescens")
+
+#set PBS as control
+NDPF$media = factor(NDPF$media, levels = c("PBS", "NaCl", "MgCl", "HA"))
+
+model = lmer(value ~ 1 + pH*media + (1|ID), data = NDPF)
+
+summary(model)
+
+confint(model) %>%
+  data.frame(.)
+
+AIC(model)
+
+model = lme(value ~ 1 + pH*media,
+            random = ~1|ID,
+            data = NDPF)
+
+anova(model)
+
+summary(model) 
+```
+
+```{r}
+ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
+
+ND$ID = paste(ND$media, ND$variable, sep = ".")
+
+NDSC = subset(ND, organism == "S.cerevisiae")
+
+#set PBS as control
+NDSC$media = factor(NDSC$media, levels = c("PBS", "NaCl", "MgCl", "HA"))
+
+model = lmer(value ~ 1 + pH*media + (1|ID), data = NDSC)
+
+summary(model)
+
+confint(model) %>%
+  data.frame(.)
+
+AIC(model)
+
+model = lme(value ~ 1 + pH*media,
+            random = ~1|ID,
+            data = NDSC)
+
+anova(model)
+
+summary(model)
+```
+
+```{r}
+ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
+
+ND$ID = paste(ND$media, ND$variable, sep = ".")
+
+PBS = subset(ND, media == "PBS")
+
+#set S.cerevisiae as control
+PBS$organism = factor(PBS$organism, levels = c("S.cerevisiae", "P.fluorescens", "S.aureus"))
+
+model = lmer(value ~ 1 + pH*organism + (1|ID), data = PBS)
+
+summary(model)
+
+confint(model) %>%
+  data.frame(.)
+
+AIC(model)
+
+model = lme(value ~ 1 + pH*organism,
+            random = ~1|ID,
+            data = PBS)
+
+anova(model)
+
+summary(model)
+```
+
+```{r}
+ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
+
+ND$ID = paste(ND$media, ND$variable, sep = ".")
+
+Sodium = subset(ND, media == "NaCl")
+
+#set S.cerevisiae as control
+Sodium$organism = factor(Sodium$organism, levels = c("S.cerevisiae", "P.fluorescens", "S.aureus"))
+
+model = lmer(value ~ 1 + pH*organism + (1|ID), data = Sodium)
+
+summary(model)
+
+confint(model) %>%
+  data.frame(.)
+
+AIC(model)
+
+model = lme(value ~ 1 + pH*organism,
+            random = ~1|ID,
+            data = Sodium)
+
+anova(model)
+
+summary(model)
+```
+
+```{r}
+ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
+
+ND$ID = paste(ND$media, ND$variable, sep = ".")
+
+Mag = subset(ND, media == "MgCl")
+
+#set S.cerevisiae as control
+Mag$organism = factor(Mag$organism, levels = c("S.cerevisiae", "P.fluorescens", "S.aureus"))
+
+model = lmer(value ~ 1 + pH*organism + (1|ID), data = Mag)
+
+summary(model)
+
+confint(model) %>%
+  data.frame(.)
+
+AIC(model)
+
+model = lme(value ~ 1 + pH*organism,
+            random = ~1|ID,
+            data = Mag)
+
+anova(model)
+
+summary(model)
+```
+
+```{r}
+ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
+
+ND$ID = paste(ND$media, ND$variable, sep = ".")
+
+HA = subset(ND, media == "HA")
+
+#set S.cerevisiae as control
+HA$organism = factor(HA$organism, levels = c("S.cerevisiae", "P.fluorescens", "S.aureus"))
+
+model = lmer(value ~ 1 + pH*organism + (1|ID), data = HA)
+
+summary(model)
+
+confint(model) %>%
+  data.frame(.)
+
+AIC(model)
+
+model = lme(value ~ 1 + pH*organism,
+            random = ~1|ID,
+            data = HA)
+
+anova(model)
+
+summary(model)
+```

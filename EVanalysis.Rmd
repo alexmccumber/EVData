@@ -14,12 +14,13 @@ library(purrr)
 library(ggplot2)
 library(nlme)
 
-#read in datafile
+#read in datafile(s)
 nickdata = read.csv("~/EVData/EVData.csv")
+parentdata = read.csv("~/EVData/ParentData.csv")
 ```
 
-```{r}
-#write function to make plots
+```{r, EV data graphs}
+#write function to make plots for EVData
 
 mediaPlot = function(medvar){
   
@@ -29,17 +30,23 @@ ND = melt(nickdata, id.vars = c("pH", "media", "organism")) %>%
 ggplot(ND, aes(x=pH, y=value)) +
   geom_point(aes(color=organism), alpha = 0.3) +
   scale_color_manual(values=c("darkslategray4", "mediumorchid4","#BF812D")) +
-  stat_summary(aes(y=value, group = organism, color = organism), fun.y = mean, geom = "line", ) +
+  #stat_summary(aes(y=value, group = organism, color = organism), fun.y = mean, geom = "line", ) +
   stat_summary(aes(y=value, group = organism), fun.data = mean_se, geom = "errorbar", width = 0.1, alpha = 0.7) +
   theme_bw() +
   xlab("pH")+
   ylab("Zeta Potential (mV)") + 
-  ggtitle(medvar)
+  ggtitle(medvar) + 
+  geom_smooth(method='lm', aes(group=organism, color = organism), se = F, show.legend = T)
 }
 
 media = list("PBS","NaCl","MgCl", "HA")
 
 MPlots = map(media, mediaPlot)
+
+#Save each file as single PDF
+pdf("~/EVData/EVFigures/MPlots%d.pdf", width = 8, height = 5, onefile = F)
+MPlots
+dev.off()
 
 OrgPlot = function(orgvar){
   
@@ -49,17 +56,26 @@ ND = melt(nickdata, id.vars = c("pH", "media", "organism")) %>%
 ggplot(ND, aes(x=pH, y=value)) +
   geom_point(aes(color=media), alpha = 0.3) +
   scale_color_manual(values=c("darkslategray4", "mediumorchid4","#BF812D", "cornflowerblue")) +
-  stat_summary(aes(y=value, group = media, color = media), fun.y = mean, geom = "line", ) +
+  #stat_summary(aes(y=value, group = media, color = media), fun.y = mean, geom = "line", ) +
   stat_summary(aes(y=value, group = media), fun.data = mean_se, geom = "errorbar", width = 0.1, alpha = 0.7) +
   theme_bw() +
   xlab("pH")+
   ylab("Zeta Potential (mV)") + 
-  ggtitle(orgvar)
+  ggtitle(orgvar)+ 
+  geom_smooth(method='lm', aes(group=media, color = media), se = F)
 }
 
 orgs = list("S.aureus", "P.fluorescens", "S.cerevisiae")
 
 OPlots = map(orgs, OrgPlot)
+
+#Save each file as single PDF
+pdf("~/EVData/EVFigures/OPlots%d.pdf", width = 8, height = 5, onefile = F)
+OPlots
+dev.off()
+
+MPlots
+OPlots
 ```
 
 ```{r}
@@ -90,7 +106,34 @@ anova(model)
 summary(model) 
 ```
 
+
 ```{r}
+ND$media = factor(ND$media, levels = c("PBS", "NaCl", "MgCl", "HA"))
+
+ND$organism = factor(ND$organism, levels = c("S.cerevisiae", "P.fluorescens", "S.aureus"))
+
+model1 = lmer(value ~ 1 + organism+media+pH + (1|ID), data = ND)
+
+model2 = lmer(value ~ 1 + organism+media*pH + (1|ID), data = ND)
+
+model3 = lmer(value ~ 1 + organism*media+pH + (1|ID), data = ND)
+
+model4 = lmer(value ~ 1 + organism*media*pH + (1|ID), data = ND)
+
+
+AIC(model1)
+AIC(model2)
+AIC(model3)
+AIC(model4)
+
+anova(model1, model2, model3, model4)
+summary(model4)
+
+confint(model4) %>%
+  data.frame(.)
+```
+
+```{r, P fluorescens model}
 ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
 
 ND$ID = paste(ND$media, ND$variable, sep = ".")
@@ -118,7 +161,7 @@ anova(model)
 summary(model) 
 ```
 
-```{r}
+```{r, S cerevisiae model}
 ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
 
 ND$ID = paste(ND$media, ND$variable, sep = ".")
@@ -146,7 +189,7 @@ anova(model)
 summary(model)
 ```
 
-```{r}
+```{r, PBS Model}
 ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
 
 ND$ID = paste(ND$media, ND$variable, sep = ".")
@@ -174,7 +217,7 @@ anova(model)
 summary(model)
 ```
 
-```{r}
+```{r, NaCl Model}
 ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
 
 ND$ID = paste(ND$media, ND$variable, sep = ".")
@@ -202,7 +245,7 @@ anova(model)
 summary(model)
 ```
 
-```{r}
+```{r, Magnesium Chloride Model}
 ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
 
 ND$ID = paste(ND$media, ND$variable, sep = ".")
@@ -230,7 +273,7 @@ anova(model)
 summary(model)
 ```
 
-```{r}
+```{r, HA data}
 ND = melt(nickdata, id.vars = c("pH", "media", "organism"))
 
 ND$ID = paste(ND$media, ND$variable, sep = ".")
@@ -252,6 +295,68 @@ AIC(model)
 model = lme(value ~ 1 + pH*organism,
             random = ~1|ID,
             data = HA)
+
+anova(model)
+
+summary(model)
+```
+
+
+```{r, repeat analysis with Parent Data}
+PD = select(parentdata, -media) %>%
+  melt(., id.vars = c("pH","organism"))
+
+PD$value = as.numeric(PD$value)
+
+PD$cell = "cell"
+
+PBS = subset(ND, media == "PBS") %>%
+  select(., -media, -ID)
+
+PBS$cell = "vesicle"
+
+PV = rbind(PD, PBS)
+
+PV$ID = paste(PV$organism, PV$cell, sep = " ")
+
+p = ggplot(PV, aes(x=pH, y=value)) +
+  geom_point(aes(color=ID), alpha = 0.3) +
+  scale_color_manual(values=c("darkslategray4","#4A72A6","mediumorchid4","#666666","#BF812D","#FFB716")) +
+  #stat_summary(aes(y=value, group = ID, color = ID), fun.y = mean, geom = "line", size = 1) +
+  stat_summary(aes(y=value, group = ID), fun.data = mean_se, geom = "errorbar", width = 0.1, alpha = 0.7) +
+  theme_bw() +
+  xlab("pH")+
+  ylab("Zeta Potential (mV)") + 
+  ggtitle("PBS")+ 
+  geom_smooth(method='lm', aes(group=ID, color = ID), se = F)
+
+ggsave("~/EVData/EVFigures/PVPlot.PDF", p, width = 8, height = 5, units = "in")
+
+p
+```
+
+```{r, PBS Model}
+ND = melt(parentdata, id.vars = c("pH", "media", "organism"))
+
+ND$ID = paste(ND$media, ND$variable, sep = ".")
+
+PBS = subset(ND, media == "PBS")
+
+#set S.cerevisiae as control
+PBS$organism = factor(PBS$organism, levels = c("S.cerevisiae", "P.fluorescens", "S.aureus"))
+
+model = lmer(value ~ 1 + pH*organism + (1|ID), data = PBS)
+
+summary(model)
+
+confint(model) %>%
+  data.frame(.)
+
+AIC(model)
+
+model = lme(value ~ 1 + pH*organism,
+            random = ~1|ID,
+            data = PBS)
 
 anova(model)
 
